@@ -31,7 +31,7 @@
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('neighborly-theme', next);
-    Sounds.click();
+    if (window.Sounds) Sounds.click();
   }
 
   function showView(name) {
@@ -39,15 +39,15 @@
     currentView = name;
 
     $$('.view').forEach(v => v.classList.remove('active'));
-    const target = $(`#view-${name}`);
+    const target = $('#view-' + name);
     if (target) target.classList.add('active');
 
     $$('.tab').forEach(t => {
       t.classList.toggle('active', t.dataset.view === name);
     });
 
-    main.scrollTop = 0;
-    Sounds.click();
+    if (main) main.scrollTop = 0;
+    if (window.Sounds) Sounds.click();
   }
 
   function categoryLabel(cat) {
@@ -60,21 +60,17 @@
 
   function renderNearby() {
     const container = $('#nearby-cards');
-    if (!container) return;
+    if (!container || !window.LISTINGS) return;
     const items = LISTINGS.slice(0, 5);
     container.innerHTML = items.map(item => `
-      <article class="listing-card" data-id="${item.id}" role="button" tabindex="0">
+      <article class="listing-card" data-id="${item.id}">
         <div class="card-img">
           <span>${item.emoji}</span>
           <span class="tag">${categoryLabel(item.category)}</span>
         </div>
         <div class="card-body">
           <h4>${item.title}</h4>
-          <div class="meta">
-            <span>${item.distance}</span>
-            <span>·</span>
-            <span>${item.when}</span>
-          </div>
+          <div class="meta">${item.distance} · ${item.when}</div>
         </div>
       </article>
     `).join('');
@@ -86,10 +82,10 @@
 
   function renderOpportunities() {
     const container = $('#opportunities');
-    if (!container) return;
+    if (!container || !window.LISTINGS) return;
     const items = LISTINGS.filter(l => l.category === 'volunteer' || l.type === 'event').slice(0, 3);
     container.innerHTML = items.map(item => `
-      <article class="list-item" data-id="${item.id}" role="button" tabindex="0">
+      <article class="list-item" data-id="${item.id}">
         <div class="li-icon">${item.emoji}</div>
         <div class="li-body">
           <h4>${item.title}</h4>
@@ -113,28 +109,22 @@
 
   function renderExplore(filter = 'all', query = '') {
     const container = $('#explore-grid');
-    if (!container) return;
+    if (!container || !window.LISTINGS) return;
 
     let items = LISTINGS;
-    if (filter !== 'all') {
-      items = items.filter(i => i.category === filter);
-    }
+    if (filter !== 'all') items = items.filter(i => i.category === filter);
     if (query.trim()) {
       const q = query.toLowerCase();
-      items = items.filter(i =>
-        i.title.toLowerCase().includes(q) ||
-        i.desc.toLowerCase().includes(q) ||
-        i.category.includes(q)
-      );
+      items = items.filter(i => i.title.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
     }
 
     if (items.length === 0) {
-      container.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--label-tertiary);padding:40px 0;">No matches yet. Be the first to share!</p>`;
+      container.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--label-tertiary);padding:40px 0;">No matches yet.</p>';
       return;
     }
 
     container.innerHTML = items.map(item => `
-      <article class="explore-card" data-id="${item.id}" role="button" tabindex="0">
+      <article class="explore-card" data-id="${item.id}">
         <div class="ec-img">${item.emoji}</div>
         <div class="ec-body">
           <h4>${item.title}</h4>
@@ -150,7 +140,7 @@
 
   function renderHighlights() {
     const container = $('#highlights');
-    if (!container) return;
+    if (!container || !window.HIGHLIGHTS) return;
     container.innerHTML = HIGHLIGHTS.map(h => `
       <div class="highlight-item">
         <span class="hi-icon">${h.icon}</span>
@@ -161,7 +151,7 @@
 
   function renderMyPosts() {
     const container = $('#my-posts');
-    if (!container) return;
+    if (!container || !window.MY_POSTS) return;
     container.innerHTML = MY_POSTS.map(p => `
       <article class="list-item">
         <div class="li-icon">${p.emoji}</div>
@@ -174,51 +164,42 @@
   }
 
   function openDetail(id) {
+    if (!window.LISTINGS) return;
     const item = LISTINGS.find(l => l.id === id);
-    if (!item) return;
+    if (!item || !detailContent) return;
 
     detailContent.innerHTML = `
       <div class="detail-img">${item.emoji}</div>
       <h2>${item.title}</h2>
       <div class="detail-meta">${item.user} · ⭐ ${item.rating} · ${item.distance}</div>
       <p class="detail-desc">${item.desc}</p>
-      <div class="detail-meta" style="margin-bottom:20px;">
-        <strong style="color:var(--label)">${item.when}</strong> · ${categoryLabel(item.category)}
-      </div>
+      <div class="detail-meta" style="margin-bottom:20px;"><strong>${item.when}</strong> · ${categoryLabel(item.category)}</div>
       <div class="detail-actions">
         <button class="primary-btn" id="claim-btn">I'm interested</button>
         <button class="secondary-btn" id="message-btn">Message</button>
       </div>
     `;
 
-    detailSheet.classList.remove('hidden');
-    Sounds.whoosh();
+    if (detailSheet) detailSheet.classList.remove('hidden');
+    if (window.Sounds) Sounds.whoosh();
 
-    $('#claim-btn').addEventListener('click', () => {
-      claimItem(id);
-      closeDetail();
-    });
-    $('#message-btn').addEventListener('click', () => {
-      showToast('Messaging coming soon — stay tuned!');
-      Sounds.click();
-    });
+    const claimBtn = $('#claim-btn');
+    if (claimBtn) claimBtn.addEventListener('click', () => { claimItem(id); closeDetail(); });
+    const msgBtn = $('#message-btn');
+    if (msgBtn) msgBtn.addEventListener('click', () => { showToast('Messaging coming soon'); if (window.Sounds) Sounds.click(); });
   }
 
   function closeDetail() {
-    detailSheet.classList.add('hidden');
-    Sounds.click();
+    if (detailSheet) detailSheet.classList.add('hidden');
+    if (window.Sounds) Sounds.click();
   }
 
   function claimItem(id) {
+    if (!window.LISTINGS) return;
     const item = LISTINGS.find(l => l.id === id);
     if (!item) return;
-    showToast(`You expressed interest in “${item.title}”. ${item.user} will be notified.`);
-    Sounds.success();
-
-    const meals = $('#impact-meals');
-    if (item.category === 'food' && meals) {
-      meals.textContent = String(+meals.textContent + 1);
-    }
+    showToast('You expressed interest in “' + item.title + '”. ' + item.user + ' will be notified.');
+    if (window.Sounds) Sounds.success();
   }
 
   function openPostModal(type = 'food') {
@@ -230,35 +211,32 @@
       volunteer: 'Offer your time', donate: 'Donate items',
       request: 'Request help', skills: 'Share a skill'
     };
-    $('#modal-title').textContent = titles[type] || 'Share something';
-    postModal.classList.remove('hidden');
-    Sounds.whoosh();
-    setTimeout(() => $('#post-title')?.focus(), 300);
+    const titleEl = $('#modal-title');
+    if (titleEl) titleEl.textContent = titles[type] || 'Share something';
+    if (postModal) postModal.classList.remove('hidden');
+    if (window.Sounds) Sounds.whoosh();
   }
 
   function closePostModal() {
-    postModal.classList.add('hidden');
-    $('#post-form')?.reset();
-    Sounds.click();
+    if (postModal) postModal.classList.add('hidden');
+    const form = $('#post-form');
+    if (form) form.reset();
+    if (window.Sounds) Sounds.click();
   }
 
   function handlePostSubmit(e) {
     e.preventDefault();
-    const title = $('#post-title').value.trim();
+    const titleInput = $('#post-title');
+    const title = titleInput ? titleInput.value.trim() : '';
     if (!title) return;
-
     closePostModal();
-    showToast(`Posted “${title}” to your neighborhood. Thank you!`);
-    Sounds.success();
-
-    const meals = $('#impact-meals');
-    if (meals && selectedCategory === 'food') {
-      meals.textContent = String(+meals.textContent + 1);
-    }
+    showToast('Posted “' + title + '” to your neighborhood. Thank you!');
+    if (window.Sounds) Sounds.success();
   }
 
   let toastTimer;
   function showToast(msg) {
+    if (!toastEl) return;
     toastEl.textContent = msg;
     toastEl.classList.remove('hidden');
     requestAnimationFrame(() => toastEl.classList.add('show'));
@@ -266,7 +244,7 @@
     toastTimer = setTimeout(() => {
       toastEl.classList.remove('show');
       setTimeout(() => toastEl.classList.add('hidden'), 300);
-    }, 3200);
+    }, 3000);
   }
 
   function bindEvents() {
@@ -274,11 +252,12 @@
       tab.addEventListener('click', () => showView(tab.dataset.view));
     });
 
-    $('#theme-toggle')?.addEventListener('click', toggleTheme);
+    const themeBtn = $('#theme-toggle');
+    if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
     $$('.qa-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        Sounds.click();
+        if (window.Sounds) Sounds.click();
         openPostModal(btn.dataset.action);
       });
     });
@@ -292,44 +271,40 @@
         $$('.chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         currentFilter = chip.dataset.filter;
-        renderExplore(currentFilter, $('#search-input')?.value || '');
-        Sounds.click();
+        renderExplore(currentFilter, ($('#search-input') || {}).value || '');
+        if (window.Sounds) Sounds.click();
       });
     });
 
-    let searchTimer;
-    $('#search-input')?.addEventListener('input', (e) => {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => {
-        renderExplore(currentFilter, e.target.value);
-      }, 200);
-    });
+    const searchInput = $('#search-input');
+    if (searchInput) {
+      let searchTimer;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => renderExplore(currentFilter, e.target.value), 200);
+      });
+    }
 
     $$('.close-modal, .modal-backdrop').forEach(el => {
       el.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal-backdrop') || e.target.closest('.close-modal')) {
-          if (!postModal.classList.contains('hidden')) closePostModal();
-          if (!detailSheet.classList.contains('hidden')) closeDetail();
+          if (postModal && !postModal.classList.contains('hidden')) closePostModal();
+          if (detailSheet && !detailSheet.classList.contains('hidden')) closeDetail();
         }
       });
     });
 
-    $('#post-form')?.addEventListener('submit', handlePostSubmit);
+    const form = $('#post-form');
+    if (form) form.addEventListener('submit', handlePostSubmit);
 
-    $('#photo-upload')?.addEventListener('click', () => {
+    const photo = $('#photo-upload');
+    if (photo) photo.addEventListener('click', () => {
       showToast('Photo picker would open here.');
-      Sounds.click();
+      if (window.Sounds) Sounds.click();
     });
 
     $$('[data-nav]').forEach(btn => {
       btn.addEventListener('click', () => showView(btn.dataset.nav));
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        if (!postModal.classList.contains('hidden')) closePostModal();
-        if (!detailSheet.classList.contains('hidden')) closeDetail();
-      }
     });
   }
 
@@ -343,9 +318,9 @@
     bindEvents();
 
     setTimeout(() => {
-      splash.classList.add('hide');
-      app.classList.remove('hidden');
-    }, 1400);
+      if (splash) splash.classList.add('hide');
+      if (app) app.classList.remove('hidden');
+    }, 800);
   }
 
   if (document.readyState === 'loading') {
