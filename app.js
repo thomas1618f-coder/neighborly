@@ -1,43 +1,16 @@
 /**
- * Neighborly — Main application logic
+ * Neighborly - Short reliable version
  */
 (function () {
   'use strict';
 
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+
   let currentView = 'home';
-  let currentFilter = 'all';
-  let selectedCategory = 'food';
-
-  const $ = (sel, ctx = document) => ctx.querySelector(sel);
-  const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
-
-  const splash = $('#splash');
-  const app = $('#app');
-  const main = $('#main');
-  const toastEl = $('#toast');
-  const postModal = $('#post-modal');
-  const detailSheet = $('#detail-sheet');
-  const detailContent = $('#detail-content');
-
-  function initTheme() {
-    const saved = localStorage.getItem('neighborly-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = saved || (prefersDark ? 'dark' : 'light');
-    document.documentElement.setAttribute('data-theme', theme);
-  }
-
-  function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') || 'light';
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('neighborly-theme', next);
-    if (window.Sounds) Sounds.click();
-  }
 
   function showView(name) {
-    if (name === currentView) return;
     currentView = name;
-
     $$('.view').forEach(v => v.classList.remove('active'));
     const target = $('#view-' + name);
     if (target) target.classList.add('active');
@@ -45,282 +18,106 @@
     $$('.tab').forEach(t => {
       t.classList.toggle('active', t.dataset.view === name);
     });
-
-    if (main) main.scrollTop = 0;
-    if (window.Sounds) Sounds.click();
   }
 
-  function categoryLabel(cat) {
-    const map = {
-      food: 'Food', tools: 'Tools', volunteer: 'Volunteer',
-      donate: 'Donate', skills: 'Skills', request: 'Request', event: 'Event'
-    };
-    return map[cat] || cat;
-  }
-
-  function renderNearby() {
-    const container = $('#nearby-cards');
-    if (!container || !window.LISTINGS) return;
-    const items = LISTINGS.slice(0, 5);
-    container.innerHTML = items.map(item => `
-      <article class="listing-card" data-id="${item.id}">
-        <div class="card-img">
-          <span>${item.emoji}</span>
-          <span class="tag">${categoryLabel(item.category)}</span>
-        </div>
-        <div class="card-body">
-          <h4>${item.title}</h4>
-          <div class="meta">${item.distance} · ${item.when}</div>
-        </div>
-      </article>
-    `).join('');
-
-    container.querySelectorAll('.listing-card').forEach(card => {
-      card.addEventListener('click', () => openDetail(+card.dataset.id));
-    });
-  }
-
-  function renderOpportunities() {
-    const container = $('#opportunities');
-    if (!container || !window.LISTINGS) return;
-    const items = LISTINGS.filter(l => l.category === 'volunteer' || l.type === 'event').slice(0, 3);
-    container.innerHTML = items.map(item => `
-      <article class="list-item" data-id="${item.id}">
-        <div class="li-icon">${item.emoji}</div>
-        <div class="li-body">
-          <h4>${item.title}</h4>
-          <p>${item.when} · ${item.distance}</p>
-        </div>
-        <button class="li-action" data-id="${item.id}">Join</button>
-      </article>
-    `).join('');
-
-    container.querySelectorAll('.list-item').forEach(el => {
-      el.addEventListener('click', (e) => {
-        if (e.target.classList.contains('li-action')) {
-          e.stopPropagation();
-          claimItem(+e.target.dataset.id);
-        } else {
-          openDetail(+el.dataset.id);
-        }
-      });
-    });
-  }
-
-  function renderExplore(filter = 'all', query = '') {
-    const container = $('#explore-grid');
-    if (!container || !window.LISTINGS) return;
-
-    let items = LISTINGS;
-    if (filter !== 'all') items = items.filter(i => i.category === filter);
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      items = items.filter(i => i.title.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
+  function openPostModal(type) {
+    const modal = $('#post-modal');
+    const title = $('#modal-title');
+    if (title) {
+      const names = {
+        food: 'Share food',
+        tool: 'Lend a tool',
+        volunteer: 'Offer your time',
+        donate: 'Donate items',
+        request: 'Request help'
+      };
+      title.textContent = names[type] || 'Share something';
     }
-
-    if (items.length === 0) {
-      container.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--label-tertiary);padding:40px 0;">No matches yet.</p>';
-      return;
-    }
-
-    container.innerHTML = items.map(item => `
-      <article class="explore-card" data-id="${item.id}">
-        <div class="ec-img">${item.emoji}</div>
-        <div class="ec-body">
-          <h4>${item.title}</h4>
-          <div class="ec-meta">${item.distance} · ${categoryLabel(item.category)}</div>
-        </div>
-      </article>
-    `).join('');
-
-    container.querySelectorAll('.explore-card').forEach(card => {
-      card.addEventListener('click', () => openDetail(+card.dataset.id));
-    });
+    if (modal) modal.classList.remove('hidden');
   }
 
-  function renderHighlights() {
-    const container = $('#highlights');
-    if (!container || !window.HIGHLIGHTS) return;
-    container.innerHTML = HIGHLIGHTS.map(h => `
-      <div class="highlight-item">
-        <span class="hi-icon">${h.icon}</span>
-        <p>${h.text}</p>
-      </div>
-    `).join('');
-  }
-
-  function renderMyPosts() {
-    const container = $('#my-posts');
-    if (!container || !window.MY_POSTS) return;
-    container.innerHTML = MY_POSTS.map(p => `
-      <article class="list-item">
-        <div class="li-icon">${p.emoji}</div>
-        <div class="li-body">
-          <h4>${p.title}</h4>
-          <p>${p.status}</p>
-        </div>
-      </article>
-    `).join('');
-  }
-
-  function openDetail(id) {
-    if (!window.LISTINGS) return;
-    const item = LISTINGS.find(l => l.id === id);
-    if (!item || !detailContent) return;
-
-    detailContent.innerHTML = `
-      <div class="detail-img">${item.emoji}</div>
-      <h2>${item.title}</h2>
-      <div class="detail-meta">${item.user} · ⭐ ${item.rating} · ${item.distance}</div>
-      <p class="detail-desc">${item.desc}</p>
-      <div class="detail-meta" style="margin-bottom:20px;"><strong>${item.when}</strong> · ${categoryLabel(item.category)}</div>
-      <div class="detail-actions">
-        <button class="primary-btn" id="claim-btn">I'm interested</button>
-        <button class="secondary-btn" id="message-btn">Message</button>
-      </div>
-    `;
-
-    if (detailSheet) detailSheet.classList.remove('hidden');
-    if (window.Sounds) Sounds.whoosh();
-
-    const claimBtn = $('#claim-btn');
-    if (claimBtn) claimBtn.addEventListener('click', () => { claimItem(id); closeDetail(); });
-    const msgBtn = $('#message-btn');
-    if (msgBtn) msgBtn.addEventListener('click', () => { showToast('Messaging coming soon'); if (window.Sounds) Sounds.click(); });
-  }
-
-  function closeDetail() {
-    if (detailSheet) detailSheet.classList.add('hidden');
-    if (window.Sounds) Sounds.click();
-  }
-
-  function claimItem(id) {
-    if (!window.LISTINGS) return;
-    const item = LISTINGS.find(l => l.id === id);
-    if (!item) return;
-    showToast('You expressed interest in “' + item.title + '”. ' + item.user + ' will be notified.');
-    if (window.Sounds) Sounds.success();
-  }
-
-  function openPostModal(type = 'food') {
-    selectedCategory = type;
-    const select = $('#post-category');
-    if (select) select.value = type === 'tool' ? 'tools' : type;
-    const titles = {
-      food: 'Share food', tool: 'Lend a tool', tools: 'Lend a tool',
-      volunteer: 'Offer your time', donate: 'Donate items',
-      request: 'Request help', skills: 'Share a skill'
-    };
-    const titleEl = $('#modal-title');
-    if (titleEl) titleEl.textContent = titles[type] || 'Share something';
-    if (postModal) postModal.classList.remove('hidden');
-    if (window.Sounds) Sounds.whoosh();
-  }
-
-  function closePostModal() {
+  function closeModals() {
+    const postModal = $('#post-modal');
+    const detailSheet = $('#detail-sheet');
     if (postModal) postModal.classList.add('hidden');
-    const form = $('#post-form');
-    if (form) form.reset();
-    if (window.Sounds) Sounds.click();
+    if (detailSheet) detailSheet.classList.add('hidden');
   }
 
-  function handlePostSubmit(e) {
-    e.preventDefault();
-    const titleInput = $('#post-title');
-    const title = titleInput ? titleInput.value.trim() : '';
-    if (!title) return;
-    closePostModal();
-    showToast('Posted “' + title + '” to your neighborhood. Thank you!');
-    if (window.Sounds) Sounds.success();
-  }
-
-  let toastTimer;
   function showToast(msg) {
-    if (!toastEl) return;
-    toastEl.textContent = msg;
-    toastEl.classList.remove('hidden');
-    requestAnimationFrame(() => toastEl.classList.add('show'));
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      toastEl.classList.remove('show');
-      setTimeout(() => toastEl.classList.add('hidden'), 300);
-    }, 3000);
+    const toast = $('#toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.remove('hidden');
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.classList.add('hidden'), 300);
+    }, 2500);
   }
 
   function bindEvents() {
+    // Tabs
     $$('.tab').forEach(tab => {
-      tab.addEventListener('click', () => showView(tab.dataset.view));
+      tab.addEventListener('click', () => {
+        showView(tab.dataset.view);
+      });
     });
 
-    const themeBtn = $('#theme-toggle');
-    if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
-
+    // Quick action buttons
     $$('.qa-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (window.Sounds) Sounds.click();
         openPostModal(btn.dataset.action);
       });
     });
 
+    // Share options
     $$('.share-option').forEach(btn => {
-      btn.addEventListener('click', () => openPostModal(btn.dataset.type));
-    });
-
-    $$('.chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        $$('.chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        currentFilter = chip.dataset.filter;
-        renderExplore(currentFilter, ($('#search-input') || {}).value || '');
-        if (window.Sounds) Sounds.click();
+      btn.addEventListener('click', () => {
+        openPostModal(btn.dataset.type);
       });
     });
 
-    const searchInput = $('#search-input');
-    if (searchInput) {
-      let searchTimer;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => renderExplore(currentFilter, e.target.value), 200);
+    // Close modals
+    $$('.close-modal, .modal-backdrop').forEach(el => {
+      el.addEventListener('click', closeModals);
+    });
+
+    // Post form
+    const form = $('#post-form');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = ($('#post-title') || {}).value || '';
+        closeModals();
+        showToast(title ? 'Posted “' + title + '” — thank you!' : 'Posted!');
       });
     }
 
-    $$('.close-modal, .modal-backdrop').forEach(el => {
-      el.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-backdrop') || e.target.closest('.close-modal')) {
-          if (postModal && !postModal.classList.contains('hidden')) closePostModal();
-          if (detailSheet && !detailSheet.classList.contains('hidden')) closeDetail();
-        }
+    // Theme toggle
+    const themeBtn = $('#theme-toggle');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => {
+        const html = document.documentElement;
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
       });
-    });
+    }
 
-    const form = $('#post-form');
-    if (form) form.addEventListener('submit', handlePostSubmit);
-
-    const photo = $('#photo-upload');
-    if (photo) photo.addEventListener('click', () => {
-      showToast('Photo picker would open here.');
-      if (window.Sounds) Sounds.click();
-    });
-
+    // See all
     $$('[data-nav]').forEach(btn => {
       btn.addEventListener('click', () => showView(btn.dataset.nav));
     });
   }
 
   function boot() {
-    initTheme();
-    renderNearby();
-    renderOpportunities();
-    renderExplore();
-    renderHighlights();
-    renderMyPosts();
-    bindEvents();
+    // Hide splash, show app
+    const splash = $('#splash');
+    const app = $('#app');
+    if (splash) splash.classList.add('hide');
+    if (app) app.classList.remove('hidden');
 
-    setTimeout(() => {
-      if (splash) splash.classList.add('hide');
-      if (app) app.classList.remove('hidden');
-    }, 800);
+    bindEvents();
+    showView('home');
   }
 
   if (document.readyState === 'loading') {
